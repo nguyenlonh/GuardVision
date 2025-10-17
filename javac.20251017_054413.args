@@ -1,0 +1,6 @@
+-classpath
+/dev/null
+-Xstdout
+/dev/null
+-proc:none
+app/src/main/java/com/guardvision/app/TextRecognitionActivity.java
