@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GuardVision</string>
+    <string name="home_welcome">Chào mừng đến GuardVision</string>
+    <string name="home_instructions">Vuốt trái một lần: Đọc thành phần\nVuốt trái hai lần: Nhận diện văn bản\nVuốt phải: Nhận diện vật thể\nVuốt lên: Tín hiệu cầu cứu\nVuốt xuống: Đọc trạng thái điện thoại</string>
+    <string name="ingredient_reader">Đọc Thành Phần</string>
+    <string name="text_recognition">Nhận Diện Văn Bản</string>
+    <string name="object_detection">Nhận Diện Vật Thể</string>
+    <string name="emergency">Cầu Cứu</string>
+    <string name="phone_status">Trạng Thái Điện Thoại</string>
+    <string name="tap_to_capture">Chạm để chụp</string>
+    <string name="processing">Đang xử lý...</string>
+    <string name="camera_permission_required">Cần quyền truy cập camera</string>
+    <string name="sms_permission_required">Cần quyền gửi SMS</string>
+    <string name="emergency_sent">Đã gửi tín hiệu cầu cứu</string>
+</resources>
