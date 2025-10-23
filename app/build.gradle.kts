@@ -87,5 +87,10 @@ dependencies {
     implementation ("com.google.android.gms:play-services-maps:18.2.0")
     implementation ("com.google.android.gms:play-services-location:21.0.1")
 
+    // TensorFlow Lite for object detection
+    implementation ("org.tensorflow:tensorflow-lite:2.13.0")
+    implementation ("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation ("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+
 
 }

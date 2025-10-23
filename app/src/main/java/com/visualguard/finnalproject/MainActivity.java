@@ -70,6 +70,9 @@ public class MainActivity extends AppCompatActivity {
                     if (diffX < 0) { // swipe left
                         handleSwipeLeft();
                         return true;
+                    } else if (diffX > 0) { // swipe right - OBSTACLE DETECTION
+                        handleSwipeRight();
+                        return true;
                     }
                 }
             } else {
@@ -121,8 +124,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void handleSwipeRight() {
+        speak("Opening obstacle detection");
+        Intent intent = new Intent(MainActivity.this, ObstacleDetectionActivity.class);
+        startActivity(intent);
+    }
+
     private void speakGreeting() {
-        String greeting = "Welcome. Swipe left once for ingredient scanner, twice for text reader. Swipe up from bottom for emergency help. Swipe down for status update.";
+        String greeting = "Welcome. " +
+                "Swipe left once for ingredient scanner, " +
+                "twice for text reader. " +
+                "Swipe right for obstacle detection. " +
+                "Swipe up from bottom for emergency help. " +
+                "Swipe down for status update.";
         speak(greeting);
     }
 
