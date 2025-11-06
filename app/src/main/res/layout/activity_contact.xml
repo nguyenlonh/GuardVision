@@ -8,23 +8,23 @@
     android:padding="20dp">
 
     <TextView
-        android:id="@+id/helpStatus"
+        android:id="@+id/contactStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Emergency Help"
-        android:textColor="#FF0000"
-        android:textSize="20sp"
+        android:text="Voice Contact Helper"
+        android:textColor="#00FF00"
+        android:textSize="18sp"
         android:textStyle="bold"
-        android:gravity="center" />
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Swipe UP to confirm emergency signal\nSwipe DOWN to cancel"
+        android:text=" Speak contact name\n Say 'call' to call\n Say 'message' to text"
         android:textColor="#FFFFFF"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:gravity="center"
-        android:layout_marginTop="20dp"
         android:lineSpacingExtra="8dp" />
 
 </LinearLayout>

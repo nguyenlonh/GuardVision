@@ -82,11 +82,9 @@ public class MainActivity extends AppCompatActivity {
                         float startY = e1.getY();
                         int height = getWindow().getDecorView().getHeight();
                         if (startY > height * 0.7f) {
-                            speak("Emergency help activated");
-                            Intent intent = new Intent(MainActivity.this, LocationHelpActivity.class);
-                            startActivity(intent);
+                            handleSwipeUp();
                         } else {
-                            speak("Swipe up from bottom for emergency");
+                            speak("Swipe up from bottom for emergency help");
                         }
                     } else { // swipe down
                         speak("Getting status update");
@@ -127,6 +125,12 @@ public class MainActivity extends AppCompatActivity {
     private void handleSwipeRight() {
         speak("Opening obstacle detection");
         Intent intent = new Intent(MainActivity.this, ObstacleDetectionActivity.class);
+        startActivity(intent);
+    }
+
+    private void handleSwipeUp() {
+        speak("Opening help signal");
+        Intent intent = new Intent(MainActivity.this, LocationHelpActivity.class);
         startActivity(intent);
     }
 
