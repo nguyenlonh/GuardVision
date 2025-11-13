@@ -4,14 +4,20 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
+import android.telecom.TelecomManager;
+import android.telephony.SmsManager;
+import android.view.MotionEvent;
+import android.view.View;
 import android.widget.TextView;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
@@ -22,10 +28,16 @@ public class ContactActivity extends AppCompatActivity {
 
     private TextToSpeech tts;
     private SpeechRecognizer speechRecognizer;
+    private View touchView;
 
-    // App states
-    private enum AppState { LISTENING_NAME, LISTENING_ACTION, LISTENING_MESSAGE }
-    private AppState currentState = AppState.LISTENING_NAME;
+    // Simple states
+    private static final int STATE_NAME = 0;
+    private static final int STATE_ACTION = 1;
+    private static final int STATE_MESSAGE = 2;
+    private static final int STATE_CONFIRM = 3;
+
+    private int currentState = STATE_NAME;
+    private boolean isListening = false;
 
     // Contact data
     private String contactName;
@@ -44,28 +56,46 @@ public class ContactActivity extends AppCompatActivity {
     private void initializeUI() {
         TextView tv = findViewById(R.id.contactStatus);
         if (tv != null) {
-            tv.setText("Say a contact name");
+            tv.setText("Touch and hold to speak");
         }
+
+        // Sử dụng toàn bộ layout làm touch area
+        touchView = findViewById(android.R.id.content);
+        setupTouchListener();
     }
 
-    private void initializeTTS() {
-        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+    private void setupTouchListener() {
+        touchView.setOnTouchListener(new View.OnTouchListener() {
             @Override
-            public void onInit(int status) {
-                if (status == TextToSpeech.SUCCESS) {
-                    tts.setLanguage(Locale.ENGLISH);
-                    tts.setSpeechRate(1.0f);
-
-                    // Start by asking for contact name
-                    speak("Say contact name");
-                    startVoiceRecognition();
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        // Bắt đầu nghe khi chạm và giữ
+                        startListening();
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        // Dừng nghe khi thả tay
+                        stopListening();
+                        return true;
                 }
+                return false;
             }
         });
     }
 
-    private void startVoiceRecognition() {
-        // Check audio permission
+    private void initializeTTS() {
+        tts = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS) {
+                tts.setLanguage(Locale.ENGLISH);
+                speak("Touch and hold screen to speak a name");
+            }
+        });
+    }
+
+    private void startListening() {
+        if (isListening) return;
+
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -73,85 +103,76 @@ public class ContactActivity extends AppCompatActivity {
             return;
         }
 
+        updateStatus("Listening...");
+        isListening = true;
+
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {}
-
-            @Override
-            public void onBeginningOfSpeech() {}
-
-            @Override
-            public void onRmsChanged(float rmsdB) {}
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {}
-
-            @Override
-            public void onEndOfSpeech() {}
-
-            @Override
-            public void onError(int error) {
-                speak("Sorry, I didn't understand. Please try again.");
-                startVoiceRecognition(); // Retry
-            }
-
             @Override
             public void onResults(Bundle results) {
                 ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (matches != null && !matches.isEmpty()) {
-                    String spokenText = matches.get(0).toLowerCase();
-                    processVoiceCommand(spokenText);
+                    processVoiceCommand(matches.get(0).toLowerCase());
                 }
+                isListening = false;
+                updateStatus("Touch and hold to speak");
             }
 
             @Override
-            public void onPartialResults(Bundle partialResults) {}
+            public void onError(int error) {
+                isListening = false;
+                updateStatus("Touch and hold to try again");
+            }
 
-            @Override
-            public void onEvent(int eventType, Bundle params) {}
+            @Override public void onReadyForSpeech(Bundle params) {}
+            @Override public void onBeginningOfSpeech() {}
+            @Override public void onRmsChanged(float rmsdB) {}
+            @Override public void onBufferReceived(byte[] buffer) {}
+            @Override public void onEndOfSpeech() {}
+            @Override public void onPartialResults(Bundle partialResults) {}
+            @Override public void onEvent(int eventType, Bundle params) {}
         });
 
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, getPromptForCurrentState());
 
         speechRecognizer.startListening(intent);
     }
 
-    private String getPromptForCurrentState() {
-        switch (currentState) {
-            case LISTENING_NAME:
-                return "Say contact name";
-            case LISTENING_ACTION:
-                return "Say call or message";
-            case LISTENING_MESSAGE:
-                return "Say your message";
-            default:
-                return "Speak now";
+    private void stopListening() {
+        if (isListening && speechRecognizer != null) {
+            speechRecognizer.stopListening();
         }
+        isListening = false;
+        updateStatus("Touch and hold to speak");
     }
 
     private void processVoiceCommand(String command) {
         switch (currentState) {
-            case LISTENING_NAME:
-                handleContactName(command);
+            case STATE_NAME:
+                searchContact(command);
                 break;
-            case LISTENING_ACTION:
+            case STATE_ACTION:
                 handleAction(command);
                 break;
-            case LISTENING_MESSAGE:
-                handleMessage(command);
+            case STATE_MESSAGE:
+                saveMessage(command);
+                break;
+            case STATE_CONFIRM:
+                if (command.contains("ok")) {
+                    sendMessage();
+                } else {
+                    speak("Say ok to send, or touch and hold to try again");
+                }
                 break;
         }
     }
 
-    private void handleContactName(String name) {
+    private void searchContact(String name) {
         contactName = name;
         speak("Searching for " + name);
 
-        // Check contacts permission
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -159,122 +180,203 @@ public class ContactActivity extends AppCompatActivity {
             return;
         }
 
-        findContactInAddressBook(name);
-    }
-
-    private void findContactInAddressBook(String name) {
-        String[] projection = new String[]{
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER
-        };
-
-        String selection = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?";
-        String[] selectionArgs = new String[]{"%" + name + "%"};
-
         Cursor cursor = getContentResolver().query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                projection, selection, selectionArgs,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+                new String[]{ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                        ContactsContract.CommonDataKinds.Phone.NUMBER},
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?",
+                new String[]{"%" + name + "%"},
+                null
         );
 
         if (cursor != null && cursor.moveToFirst()) {
-            String foundName = cursor.getString(cursor.getColumnIndexOrThrow(
+            contactName = cursor.getString(cursor.getColumnIndexOrThrow(
                     ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
             phoneNumber = cursor.getString(cursor.getColumnIndexOrThrow(
                     ContactsContract.CommonDataKinds.Phone.NUMBER));
             cursor.close();
 
-            updateStatus("Found: " + foundName);
-            speak("Found " + foundName + ". Say call to call or message to send text.");
-            currentState = AppState.LISTENING_ACTION;
-            startVoiceRecognition();
-
+            updateStatus("Found: " + contactName);
+            speak("Found " + contactName + ". Touch and hold, then say call or message");
+            currentState = STATE_ACTION;
         } else {
             if (cursor != null) cursor.close();
-            updateStatus("Contact not found");
-            speak("Contact not found. Please say another name.");
-            startVoiceRecognition(); // Retry
+            speak("Name not found. Touch and hold, then say another name");
         }
     }
 
     private void handleAction(String action) {
         if (action.contains("call")) {
+            // Kiểm tra quyền CALL_PHONE trước khi gọi
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{android.Manifest.permission.CALL_PHONE}, 3);
+                return;
+            }
             makePhoneCall();
-        } else if (action.contains("message") || action.contains("text")) {
-            speak("What message do you want to send?");
-            currentState = AppState.LISTENING_MESSAGE;
-            startVoiceRecognition();
+        } else if (action.contains("message")) {
+            speak("Touch and hold, then say your message");
+            currentState = STATE_MESSAGE;
         } else {
-            speak("Please say call or message.");
-            startVoiceRecognition(); // Retry
+            speak("Touch and hold, then say call or message");
         }
     }
 
-    private void handleMessage(String message) {
+    private void saveMessage(String message) {
         messageContent = message;
-        speak("Message ready: " + message + ". Say send to confirm.");
-
-        // Wait for send confirmation
-        currentState = AppState.LISTENING_ACTION; // Reuse for send confirmation
-        startVoiceRecognition();
-
-        // Check if user says "send"
-        if (message.toLowerCase().contains("send")) {
-            sendSMS();
-        }
+        speak("Your message: " + message + ". Touch and hold, then say ok to send");
+        currentState = STATE_CONFIRM;
     }
 
     private void makePhoneCall() {
         if (phoneNumber != null) {
-            // Use ACTION_DIAL to open dialer (no CALL_PHONE permission needed)
-            Intent intent = new Intent(Intent.ACTION_DIAL);
-            intent.setData(Uri.parse("tel:" + phoneNumber));
-            startActivity(intent);
-            speak("Opening dialer for " + contactName);
-        } else {
-            speak("No phone number found for " + contactName);
-        }
-        finishAfterDelay();
-    }
+            try {
+                boolean callStarted = false;
 
-    private void sendSMS() {
-        if (phoneNumber != null && messageContent != null) {
-            Intent intent = new Intent(Intent.ACTION_SENDTO);
-            intent.setData(Uri.parse("smsto:" + phoneNumber));
-            intent.putExtra("sms_body", messageContent);
-            startActivity(intent);
-            speak("Opening message app for " + contactName);
-        } else {
-            speak("Cannot send message. Missing phone number or message content.");
-        }
-        finishAfterDelay();
-    }
+                // Ưu tiên sử dụng TelecomManager cho API 23+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    callStarted = makeDirectCallWithTelecomManager();
+                }
 
-    private void finishAfterDelay() {
-        // Wait a bit before finishing to let TTS complete
-        new android.os.Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                finish();
+                // Nếu TelecomManager không hoạt động, thử các phương pháp khác
+                if (!callStarted) {
+                    callStarted = makeCallWithSpecificDialer();
+                }
+
+                // Fallback cuối cùng: sử dụng Intent thông thường
+                if (!callStarted) {
+                    Intent intent = new Intent(Intent.ACTION_CALL);
+                    intent.setData(Uri.parse("tel:" + phoneNumber));
+                    startActivity(intent);
+                }
+
+                speak("Calling " + contactName + " now");
+                resetToStart();
+
+            } catch (SecurityException e) {
+                speak("Cannot make call. Permission denied");
+                resetToStart();
+            } catch (Exception e) {
+                speak("Error making call");
+                resetToStart();
             }
-        }, 3000);
+        } else {
+            speak("No number found for " + contactName);
+            resetToStart();
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    private boolean makeDirectCallWithTelecomManager() {
+        try {
+            TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
+            if (telecomManager != null) {
+                Uri uri = Uri.fromParts("tel", phoneNumber, null);
+                Bundle extras = new Bundle();
+                telecomManager.placeCall(uri, extras);
+                return true;
+            }
+        } catch (Exception e) {
+            // TelecomManager không khả dụng, tiếp tục với phương pháp khác
+        }
+        return false;
+    }
+
+    private boolean makeCallWithSpecificDialer() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_CALL);
+            intent.setData(Uri.parse("tel:" + phoneNumber));
+
+            // Thử các package dialer phổ biến
+            String[] dialerPackages = {
+                    "com.android.phone",
+                    "com.android.dialer",
+                    "com.google.android.dialer",
+                    "com.samsung.android.dialer",
+                    "com.huawei.dialer"
+            };
+
+            for (String pkg : dialerPackages) {
+                try {
+                    // Kiểm tra xem package có tồn tại không
+                    getPackageManager().getPackageInfo(pkg, 0);
+                    intent.setPackage(pkg);
+                    startActivity(intent);
+                    return true;
+                } catch (PackageManager.NameNotFoundException e) {
+                    // Package không tồn tại, tiếp tục thử package tiếp theo
+                }
+            }
+        } catch (Exception e) {
+            // Bỏ qua lỗi và thử phương pháp tiếp theo
+        }
+        return false;
+    }
+
+    private void sendMessage() {
+        if (phoneNumber != null && messageContent != null) {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{android.Manifest.permission.SEND_SMS}, 4);
+                return;
+            }
+
+            try {
+                SmsManager.getDefault().sendTextMessage(phoneNumber, null, messageContent, null, null);
+                speak("Message sent successfully to " + contactName);
+                resetToStart();
+            } catch (Exception e) {
+                speak("Failed to send message. Please try again");
+                resetToStart();
+            }
+        } else {
+            speak("Cannot send message. Missing information");
+            resetToStart();
+        }
+    }
+
+    private void resetToStart() {
+        new android.os.Handler().postDelayed(() -> {
+            currentState = STATE_NAME;
+            contactName = null;
+            phoneNumber = null;
+            messageContent = null;
+
+            updateStatus("Touch and hold to speak");
+            speak("Touch and hold screen to speak a name");
+        }, 2000);
     }
 
     private void updateStatus(String message) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                TextView tv = findViewById(R.id.contactStatus);
-                if (tv != null) {
-                    tv.setText(message);
-                }
-            }
+        runOnUiThread(() -> {
+            TextView tv = findViewById(R.id.contactStatus);
+            if (tv != null) tv.setText(message);
         });
     }
 
     private void speak(String text) {
         if (tts != null) {
-            tts.speak(text, TextToSpeech.QUEUE_ADD, null, "contact-tts");
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "contact");
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // Permission granted, thử lại hành động
+            if (requestCode == 3) { // CALL_PHONE permission
+                makePhoneCall();
+            } else if (requestCode == 4) { // SEND_SMS permission
+                sendMessage();
+            } else {
+                updateStatus("Touch and hold to speak");
+            }
+        } else {
+            speak("Permission needed to continue");
+            resetToStart();
         }
     }
 
@@ -282,7 +384,6 @@ public class ContactActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (tts != null) {
-            tts.stop();
             tts.shutdown();
         }
         if (speechRecognizer != null) {
@@ -291,18 +392,8 @@ public class ContactActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            // Permission granted, retry the operation
-            if (requestCode == 1) { // RECORD_AUDIO
-                startVoiceRecognition();
-            } else if (requestCode == 2) { // READ_CONTACTS
-                findContactInAddressBook(contactName);
-            }
-        } else {
-            speak("Permission denied. Please enable permissions in settings.");
-            finish();
-        }
+    public void onBackPressed() {
+        speak("Returning to main screen");
+        super.onBackPressed();
     }
 }

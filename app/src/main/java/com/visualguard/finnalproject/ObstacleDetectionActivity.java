@@ -118,11 +118,11 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         textureView = findViewById(R.id.textureView);
         boundingBoxOverlay = findViewById(R.id.boundingBoxOverlay);
 
-        // TextureView listener - CORE của Kotlin code
+        // TextureView listener
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                openCamera(); // Giống Kotlin code
+                openCamera();
             }
 
             @Override

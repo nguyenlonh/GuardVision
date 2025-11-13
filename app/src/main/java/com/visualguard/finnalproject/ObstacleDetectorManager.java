@@ -35,7 +35,7 @@ public class ObstacleDetectorManager {
                 "dog", "cat", "bird", "horse", "cow",
                 "bench", "potted plant", "fire hydrant",
                 "bookshelf", "cabinet", "table",
-                "cell phone", "tv", "laptop" // Thêm vật thể nhỏ quan trọng
+                "cell phone", "tv", "laptop"
         ));
     }
 

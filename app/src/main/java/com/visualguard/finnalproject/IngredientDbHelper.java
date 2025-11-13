@@ -33,13 +33,16 @@ public class IngredientDbHelper extends SQLiteOpenHelper {
                 + COLUMN_NAME + " TEXT PRIMARY KEY COLLATE NOCASE, "
                 + COLUMN_EFFECTS + " TEXT)");
 
-        // initial sample data
         insertIfNotExists(db, "Sugar", "May increase blood sugar");
         insertIfNotExists(db, "Trans fat", "Raises bad cholesterol");
         insertIfNotExists(db, "Alcohol", "Not safe for children or certain illnesses");
         insertIfNotExists(db, "Nicotine", "Addictive and harmful");
         insertIfNotExists(db, "Peanut", "May cause severe allergy");
-        insertIfNotExists(db, "Orange", "Generally safe, contains vitamin C");
+        insertIfNotExists(db, "Gluten", "Problematic for celiac disease");
+        insertIfNotExists(db, "Shellfish", "May cause serious allergic reactions");
+        insertIfNotExists(db, "Tree Nut", "Severe allergy risk - almonds, walnuts etc");
+        insertIfNotExists(db, "Lactose", "Digestive issues for lactose intolerant");
+
     }
 
     @Override
