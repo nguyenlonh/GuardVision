@@ -1,26 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:orientation="vertical">
 
-    <!-- TextureView for camera preview -->
+    <!-- Camera Preview - Full screen -->
     <TextureView
         android:id="@+id/textureView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- ImageView for displaying processed frames (your current approach) -->
-    <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY" />
+        android:layout_centerInParent="true" />
 
-    <!-- BoundingBoxOverlayView for drawing bounding boxes -->
+    <!-- Overlay for drawing bounding boxes (transparent) -->
     <com.visualguard.finnalproject.BoundingBoxOverlayView
         android:id="@+id/boundingBoxOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent" />
+
+    <!-- Status indicator at top -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:background="#80000000"
+        android:padding="12dp"
+        android:text="Indoor Object Detection Active"
+        android:textColor="@android:color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <!-- Simple instruction at bottom -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#80000000"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Move camera to detect objects"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Objects will be announced by voice"
+            android:textColor="#CCCCCC"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
 </RelativeLayout>
