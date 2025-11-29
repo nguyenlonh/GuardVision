@@ -140,22 +140,6 @@ You can adjust these files to fit your target devices and features.
 
 ---
 
-## Roadmap (Suggested)
-
-You can adapt this list to your actual plan:
-
-- [ ] Design main screen UI/UX.
-- [ ] Integrate real-time camera preview.
-- [ ] Implement basic motion detection / frame analysis.
-- [ ] Integrate AI/ML models (face/object/intrusion detection, etc.).
-- [ ] Implement alert system (notifications, logs, video/image capture).
-- [ ] Implement event history screen.
-- [ ] Optimize performance and memory usage.
-- [ ] Add unit and instrumentation tests.
-- [ ] Improve documentation and API reference.
-
----
-
 ## Contributing
 
 Contributions are welcome.
