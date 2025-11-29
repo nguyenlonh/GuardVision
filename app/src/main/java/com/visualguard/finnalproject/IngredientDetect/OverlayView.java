@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.IngredientDetect;
 
 import android.content.Context;
 import android.graphics.Canvas;

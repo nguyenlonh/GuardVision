@@ -9,6 +9,10 @@ import android.view.MotionEvent;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.visualguard.finnalproject.IngredientDetect.IngredientDetectActivity;
+import com.visualguard.finnalproject.ObjectDetect.ObstacleDetectionActivity;
+import com.visualguard.finnalproject.TextDetect.TextDetectionActivity;
+
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -99,7 +103,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleSwipeLeft() {
         swipeLeftCount++;
-
         if (swipeLeftCount == 1) {
             // First swipe left
             speak("Swipe left again for text reading");

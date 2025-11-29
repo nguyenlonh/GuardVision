@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.ObjectDetect;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -10,7 +10,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
-import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.TextView;
@@ -20,7 +19,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import org.tensorflow.lite.support.common.FileUtil;
+import com.visualguard.finnalproject.R;
+
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
 import org.tensorflow.lite.support.image.ops.ResizeOp;
@@ -82,7 +82,7 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(Locale.ENGLISH);
                 tts.setSpeechRate(0.9f);
-                speak("Indoor object detection started. I will announce objects around you.");
+                speak("object detection started. I will announce objects around you.");
             } else {
                 Log.e(TAG, "TTS initialization failed");
             }
@@ -166,14 +166,8 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         if (bitmap == null) return;
 
         try {
-            // Store original dimensions for scaling
             int originalWidth = bitmap.getWidth();
             int originalHeight = bitmap.getHeight();
-
-            // Update scale factors if needed (should be done in texture size changed, but just in case)
-            if (scaleFactorX == 1.0f || scaleFactorY == 1.0f) {
-                updateScaleFactors(originalWidth, originalHeight);
-            }
 
             // Convert to TensorImage and process
             TensorImage image = TensorImage.fromBitmap(bitmap);
@@ -182,13 +176,13 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
             // Run object detection
             List<Detection> detections = objectDetector.detect(image);
 
-            // Scale bounding boxes to match original image size
+            // Scale bounding boxes từ model (480x480) về bitmap size
             List<Detection> scaledDetections = scaleBoundingBoxes(detections, originalWidth, originalHeight);
 
-            // Update bounding box overlay with scaled detections
+            // Update bounding box overlay
             boundingBoxOverlay.setDetections(scaledDetections);
 
-            // Process for voice announcements (use original detections for analysis)
+            // Process for voice announcements
             processDetectionsForSpeech(detections, originalWidth, originalHeight);
 
         } catch (Exception e) {
@@ -196,22 +190,23 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         }
     }
 
-    private List<Detection> scaleBoundingBoxes(List<Detection> detections, int originalWidth, int originalHeight) {
+    private List<Detection> scaleBoundingBoxes(List<Detection> detections, int bitmapWidth, int bitmapHeight) {
         if (detections == null) return detections;
+
+        // Scale từ model size (480x480) về bitmap size
+        float scaleX = (float) bitmapWidth / MODEL_INPUT_SIZE;
+        float scaleY = (float) bitmapHeight / MODEL_INPUT_SIZE;
 
         for (Detection detection : detections) {
             RectF boundingBox = detection.getBoundingBox();
 
-            // Scale bounding box from model coordinates (480x480) to original image coordinates
-            float left = boundingBox.left * scaleFactorX;
-            float top = boundingBox.top * scaleFactorY;
-            float right = boundingBox.right * scaleFactorX;
-            float bottom = boundingBox.bottom * scaleFactorY;
+            float left = boundingBox.left * scaleX;
+            float top = boundingBox.top * scaleY;
+            float right = boundingBox.right * scaleX;
+            float bottom = boundingBox.bottom * scaleY;
 
-            // Create new scaled bounding box
             RectF scaledBoundingBox = new RectF(left, top, right, bottom);
 
-            // Use reflection to set the scaled bounding box (since Detection class doesn't have setter)
             try {
                 java.lang.reflect.Field field = detection.getClass().getDeclaredField("boundingBox");
                 field.setAccessible(true);

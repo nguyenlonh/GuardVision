@@ -13,7 +13,7 @@
         android:layout_centerInParent="true" />
 
     <!-- Overlay for drawing bounding boxes (transparent) -->
-    <com.visualguard.finnalproject.BoundingBoxOverlayView
+    <com.visualguard.finnalproject.ObjectDetect.BoundingBoxOverlayView
         android:id="@+id/boundingBoxOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.TextDetect;
 
 
 import android.Manifest;
@@ -24,6 +24,7 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import com.visualguard.finnalproject.R;
 
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -39,7 +40,7 @@ public class TextDetectionActivity extends AppCompatActivity {
     // Biến để quản lý việc đọc
     private String lastDetectedText = "";
     private long lastReadTime = 0;
-    private static final long READ_COOLDOWN = 4000; // 8 giây chờ giữa các lần đọc
+    private static final long READ_COOLDOWN = 8000; // 8 giây chờ giữa các lần đọc
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -156,7 +157,6 @@ public class TextDetectionActivity extends AppCompatActivity {
 
         // Chỉ đọc nếu văn bản khác biệt đáng kể và đã đủ thời gian chờ
         if (isDifferentEnough && (currentTime - lastReadTime) > READ_COOLDOWN) {
-            // Giới hạn độ dài văn bản để tránh quá dài
             String textToRead = currentText;
             if (textToRead.length() > 600) {
                 textToRead = textToRead.substring(0, 600) + "...";

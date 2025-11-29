@@ -8,7 +8,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
-    <com.visualguard.finnalproject.OverlayView
+    <com.visualguard.finnalproject.IngredientDetect.OverlayView
         android:id="@+id/overlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>

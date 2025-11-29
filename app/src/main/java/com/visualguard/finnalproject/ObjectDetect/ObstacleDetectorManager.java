@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.ObjectDetect;
 
 import android.content.Context;
 import android.util.Log;
@@ -101,8 +101,10 @@ public class ObstacleDetectorManager {
                 return null;
             }
         } else {
-            consecutiveSameObjectCount = 1; // Reset counter for new object
+            consecutiveSameObjectCount = 1;
         }
+
+        // Reset counter for new object
 
         // 5. Calculate detailed direction and distance
         String direction = getDetailedDirection(centerX, centerY, imageWidth, imageHeight);

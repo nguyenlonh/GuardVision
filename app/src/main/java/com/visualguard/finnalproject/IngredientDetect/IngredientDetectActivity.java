@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.IngredientDetect;
 
 import android.Manifest;
 import android.content.Intent;
@@ -28,6 +28,8 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import com.visualguard.finnalproject.R;
+import com.visualguard.finnalproject.TextDetect.TextDetectionActivity;
 
 import java.util.ArrayList;
 import java.util.List;

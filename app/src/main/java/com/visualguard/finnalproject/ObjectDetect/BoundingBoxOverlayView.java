@@ -1,4 +1,4 @@
-package com.visualguard.finnalproject;
+package com.visualguard.finnalproject.ObjectDetect;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -59,6 +59,9 @@ public class BoundingBoxOverlayView extends View {
             return;
         }
 
+        int viewWidth = getWidth();
+        int viewHeight = getHeight();
+
         for (int i = 0; i < detections.size(); i++) {
             Detection detection = detections.get(i);
             if (detection.getCategories() != null && !detection.getCategories().isEmpty()) {
@@ -67,13 +70,22 @@ public class BoundingBoxOverlayView extends View {
                 RectF boundingBox = detection.getBoundingBox();
 
                 if (confidence > 0.3f) {
+                    // Scale từ bitmap coordinates về view coordinates
+                    float scaleX = (float) viewWidth / boundingBox.width();
+                    float scaleY = (float) viewHeight / boundingBox.height();
+
+                    float left = boundingBox.left;
+                    float top = boundingBox.top;
+                    float right = boundingBox.right;
+                    float bottom = boundingBox.bottom;
+
                     // Draw bounding box
                     boxPaint.setColor(colors[i % colors.length]);
-                    canvas.drawRect(boundingBox, boxPaint);
+                    canvas.drawRect(left, top, right, bottom, boxPaint);
 
                     // Draw label
                     String text = String.format("%s %.1f", label, confidence);
-                    canvas.drawText(text, boundingBox.left, boundingBox.top - 10, textPaint);
+                    canvas.drawText(text, left, Math.max(top - 10, 20), textPaint);
                 }
             }
         }
