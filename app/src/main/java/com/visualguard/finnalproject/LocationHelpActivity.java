@@ -129,11 +129,26 @@ public class LocationHelpActivity extends AppCompatActivity {
         }
     }
 
+    private boolean isNetwordAvailable(){
+        android.net.ConnectivityManager cm =
+                (android.net.ConnectivityManager)
+                        getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+        android.net.NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        return netInfo != null && netInfo.isConnectedOrConnecting();
+    }
+
     /**
      * Handle swipe up - confirm and send emergency signal
      */
     private void handleSwipeUpConfirmation() {
         if (isWaitingForConfirmation && !helpSignalSent) {
+
+            if (!isNetwordAvailable()){
+                speak("No internet connection. Cannot send help signal.");
+                updateStatusText("No internet connection. Help signal not sent.");
+                return;
+            }
+
             isWaitingForConfirmation = false;
             helpSignalSent = true;
 
@@ -266,8 +281,8 @@ public class LocationHelpActivity extends AppCompatActivity {
                 // Create emergency message
                 String message = "🚨 EMERGENCY HELP REQUEST 🚨\n" +
                         "I am a visually impaired person and I need immediate assistance!\n\n" +
-                        "📍 Location Details:\n" + locationInfo + "\n\n" +
-                        "⚠️ Please send help to this location immediately!";
+                        "Location Details:\n" + locationInfo + "\n\n" +
+                        "Please send help to this location immediately!";
 
                 // Send via Telegram
                 return sendTelegramMessage(message);

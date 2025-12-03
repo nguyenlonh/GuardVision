@@ -2,6 +2,7 @@ package com.visualguard.finnalproject.TextDetect;
 
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.Image;
 import android.os.Bundle;
@@ -24,6 +25,7 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import com.visualguard.finnalproject.MainActivity;
 import com.visualguard.finnalproject.R;
 
 import java.util.Locale;
@@ -67,7 +69,18 @@ public class TextDetectionActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        if (tts != null && tts.isSpeaking()) {
+            tts.stop();
+        }
+
+        Intent intent = new Intent(TextDetectionActivity.this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
         finish();
+    }
+
+    private void cleanupResources(){
+
     }
 
     private void startCamera() {

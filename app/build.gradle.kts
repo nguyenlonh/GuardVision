@@ -81,7 +81,6 @@ dependencies {
     implementation ("androidx.camera:camera-view:1.3.3")
 
     implementation ("com.google.android.gms:play-services-location:21.0.1")
-    implementation ("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Google Maps - sử dụng version mới nhất
     implementation ("com.google.android.gms:play-services-maps:18.2.0")
