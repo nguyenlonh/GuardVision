@@ -20,7 +20,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Swipe UP to confirm emergency signal\nSwipe DOWN to cancel"
+        android:text="Swipe UP to confirm emergency signal\nSwipe DOWN to cancel and open contact support"
         android:textColor="#FFFFFF"
         android:textSize="16sp"
         android:gravity="center"
