@@ -197,7 +197,7 @@ public class ContactActivity extends AppCompatActivity {
             cursor.close();
 
             updateStatus("Found: " + contactName);
-            speak("Found " + contactName + ". Touch and hold, then say call or message");
+            speak("Found " + contactName + ". Touch and hold, then say call, message, or clear to choose another contact");
             currentState = STATE_ACTION;
         } else {
             if (cursor != null) cursor.close();
@@ -206,7 +206,8 @@ public class ContactActivity extends AppCompatActivity {
     }
 
     private void handleAction(String action) {
-        if (action.contains("call")) {
+        if (action.contains("call") || action.contains("cold") || action.contains("col") || action.contains("cancel")
+                || action.contains("dial")) {
             // Kiểm tra quyền CALL_PHONE trước khi gọi
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -215,11 +216,21 @@ public class ContactActivity extends AppCompatActivity {
                 return;
             }
             makePhoneCall();
-        } else if (action.contains("message")) {
+        } else if (action.contains("message") || action.contains("sources") || action.contains("back") || action.contains("cancel")
+                || action.contains("massage")) {
             speak("Touch and hold, then say your message");
             currentState = STATE_MESSAGE;
+        } else if (action.contains("clear") || action.contains("cler") || action.contains("klir")
+                || action.contains("klear") || action.contains("back") || action.contains("cancel")
+                || action.contains("other") || action.contains("another")) {
+            // Quay lại bước chọn tên liên hệ
+            contactName = null;
+            phoneNumber = null;
+            currentState = STATE_NAME;
+            updateStatus("Touch and hold to speak");
+            speak("Cleared. Touch and hold screen to speak another name");
         } else {
-            speak("Touch and hold, then say call or message");
+            speak("Touch and hold, then say call, message, or clear to choose another contact");
         }
     }
 
@@ -270,6 +281,12 @@ public class ContactActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.M)
     private boolean makeDirectCallWithTelecomManager() {
         try {
+            // Kiểm tra quyền trước khi gọi placeCall
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+
             TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
             if (telecomManager != null) {
                 Uri uri = Uri.fromParts("tel", phoneNumber, null);
@@ -277,8 +294,11 @@ public class ContactActivity extends AppCompatActivity {
                 telecomManager.placeCall(uri, extras);
                 return true;
             }
+        } catch (SecurityException e) {
+            // Quyền bị từ chối
+            return false;
         } catch (Exception e) {
-            // TelecomManager không khả dụng, tiếp tục với phương pháp khác
+            // TelecomManager không khả dụng
         }
         return false;
     }
