@@ -10,14 +10,13 @@ import android.view.View;
 
 import org.tensorflow.lite.task.vision.detector.Detection;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BoundingBoxOverlayView extends View {
-    private List<Detection> detections;
-    private Paint boxPaint, textPaint;
-    private float scaleFactor = 1.0f;
+    private List<DrawableDetection> drawableDetections;
+    private Paint boxPaint, textPaint, textBackgroundPaint;
 
-    // Color palette for different objects
     private int[] colors = {
             Color.BLUE, Color.GREEN, Color.RED, Color.CYAN, Color.MAGENTA,
             Color.YELLOW, Color.WHITE, Color.rgb(255, 165, 0)
@@ -34,60 +33,101 @@ public class BoundingBoxOverlayView extends View {
     }
 
     private void init() {
-        // Box paint
         boxPaint = new Paint();
         boxPaint.setStyle(Paint.Style.STROKE);
         boxPaint.setStrokeWidth(4f);
+        boxPaint.setAntiAlias(true);
 
-        // Text paint
         textPaint = new Paint();
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(36f);
         textPaint.setStyle(Paint.Style.FILL);
+        textPaint.setAntiAlias(true);
+
+        textBackgroundPaint = new Paint();
+        textBackgroundPaint.setStyle(Paint.Style.FILL);
+        textBackgroundPaint.setAntiAlias(true);
+
+        drawableDetections = new ArrayList<>();
     }
 
-    public void setDetections(List<Detection> detections) {
-        this.detections = detections;
-        invalidate(); // Redraw view
+    public void setDetections(List<?> detections) {
+        drawableDetections.clear();
+
+        if (detections != null) {
+            for (Object obj : detections) {
+                if (obj instanceof ScaledDetection) {
+                    ScaledDetection sd = (ScaledDetection) obj;
+                    drawableDetections.add(new DrawableDetection(
+                            sd.getLabel(),
+                            sd.getScore(),
+                            sd.getBoundingBox()
+                    ));
+                } else if (obj instanceof Detection) {
+                    Detection d = (Detection) obj;
+                    if (d.getCategories() != null && !d.getCategories().isEmpty()) {
+                        drawableDetections.add(new DrawableDetection(
+                                d.getCategories().get(0).getLabel(),
+                                d.getCategories().get(0).getScore(),
+                                d.getBoundingBox()
+                        ));
+                    }
+                }
+            }
+        }
+
+        invalidate();
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        if (detections == null || detections.isEmpty()) {
+        if (drawableDetections == null || drawableDetections.isEmpty()) {
             return;
         }
 
-        int viewWidth = getWidth();
-        int viewHeight = getHeight();
+        for (int i = 0; i < drawableDetections.size(); i++) {
+            DrawableDetection detection = drawableDetections.get(i);
 
-        for (int i = 0; i < detections.size(); i++) {
-            Detection detection = detections.get(i);
-            if (detection.getCategories() != null && !detection.getCategories().isEmpty()) {
-                String label = detection.getCategories().get(0).getLabel();
-                float confidence = detection.getCategories().get(0).getScore();
-                RectF boundingBox = detection.getBoundingBox();
+            if (detection.confidence > 0.3f) {
+                int color = colors[i % colors.length];
+                RectF box = detection.boundingBox;
 
-                if (confidence > 0.3f) {
-                    // Scale từ bitmap coordinates về view coordinates
-                    float scaleX = (float) viewWidth / boundingBox.width();
-                    float scaleY = (float) viewHeight / boundingBox.height();
+                // Draw bounding box
+                boxPaint.setColor(color);
+                canvas.drawRect(box, boxPaint);
 
-                    float left = boundingBox.left;
-                    float top = boundingBox.top;
-                    float right = boundingBox.right;
-                    float bottom = boundingBox.bottom;
+                // Draw label background
+                String text = String.format("%s %.0f%%", detection.label, detection.confidence * 100);
+                float textWidth = textPaint.measureText(text);
+                float textHeight = textPaint.getTextSize();
 
-                    // Draw bounding box
-                    boxPaint.setColor(colors[i % colors.length]);
-                    canvas.drawRect(left, top, right, bottom, boxPaint);
+                textBackgroundPaint.setColor(Color.argb(180, 0, 0, 0));
+                canvas.drawRect(
+                        box.left,
+                        Math.max(box.top - textHeight - 8, 0),
+                        box.left + textWidth + 16,
+                        Math.max(box.top, textHeight + 8),
+                        textBackgroundPaint
+                );
 
-                    // Draw label
-                    String text = String.format("%s %.1f", label, confidence);
-                    canvas.drawText(text, left, Math.max(top - 10, 20), textPaint);
-                }
+                // Draw label text
+                canvas.drawText(text, box.left + 8, Math.max(box.top - 8, textHeight), textPaint);
             }
+        }
+    }
+
+    // Internal class to store drawable detection data
+    private static class DrawableDetection {
+        final String label;
+        final float confidence;
+        final RectF boundingBox;
+
+        DrawableDetection(String label, float confidence, RectF boundingBox) {
+            this.label = label;
+            this.confidence = confidence;
+            this.boundingBox = boundingBox;
         }
     }
 }

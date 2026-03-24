@@ -5,19 +5,17 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
-
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
 
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -34,9 +32,13 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         tools:targetApi="31">
         <activity
+            android:name=".DepthDetection.DepthDetectionActivity"
+            android:exported="false" />
+        <activity
             android:name=".ObjectDetect.ObstacleDetectionActivity"
             android:exported="false" />
-        <activity android:name=".ContactActivity"
+        <activity
+            android:name=".ContactActivity"
             android:exported="false" />
         <activity
             android:name=".IngredientDetect.IngredientDetectActivity"

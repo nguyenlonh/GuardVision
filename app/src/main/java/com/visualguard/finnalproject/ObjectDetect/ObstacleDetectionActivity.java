@@ -28,9 +28,11 @@ import org.tensorflow.lite.task.vision.detector.Detection;
 import org.tensorflow.lite.task.vision.detector.ObjectDetector;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObstacleDetectionActivity extends AppCompatActivity {
     private static final String TAG = "ObstacleDetection";
@@ -42,6 +44,7 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
 
     private CameraDevice cameraDevice;
     private Handler backgroundHandler;
+    private HandlerThread backgroundThread;
     private CameraManager cameraManager;
 
     private ObjectDetector objectDetector;
@@ -52,10 +55,16 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
     // Model configuration
     private static final int MODEL_INPUT_SIZE = 480;
     private long lastProcessingTime = 0;
-    private static final long PROCESSING_INTERVAL = 150; // ms between processing frames
-    private boolean isDetectionActive = false;
+    private static final long PROCESSING_INTERVAL = 150;
 
-    // For bounding box scaling
+    // Thread-safe flags
+    private AtomicBoolean isDetectionActive = new AtomicBoolean(false);
+    private AtomicBoolean isProcessingFrame = new AtomicBoolean(false);
+
+    // Reusable TensorImage to reduce allocations
+    private TensorImage reusableTensorImage;
+
+    // Scale factors
     private float scaleFactorX = 1.0f;
     private float scaleFactorY = 1.0f;
 
@@ -76,13 +85,37 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         textureView.setSurfaceTextureListener(surfaceTextureListener);
     }
 
+    private void startBackgroundThread() {
+        if (backgroundThread == null) {
+            backgroundThread = new HandlerThread("CameraBackground");
+            backgroundThread.start();
+            backgroundHandler = new Handler(backgroundThread.getLooper());
+        }
+    }
+
+    private void stopBackgroundThread() {
+        if (backgroundThread != null) {
+            backgroundThread.quitSafely();
+            try {
+                backgroundThread.join();
+                backgroundThread = null;
+                backgroundHandler = null;
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Error stopping background thread", e);
+            }
+        }
+    }
+
     private void initializeComponents() {
-        // Initialize TTS for English
+        // Start background thread first
+        startBackgroundThread();
+
+        // Initialize TTS
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(Locale.ENGLISH);
                 tts.setSpeechRate(0.9f);
-                speak("object detection started. I will announce objects around you.");
+                speak("Object detection started. I will announce objects around you.");
             } else {
                 Log.e(TAG, "TTS initialization failed");
             }
@@ -94,6 +127,9 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         imageProcessor = new ImageProcessor.Builder()
                 .add(new ResizeOp(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
                 .build();
+
+        // Initialize reusable TensorImage
+        reusableTensorImage = new TensorImage();
 
         // Load TensorFlow Lite model
         try {
@@ -115,14 +151,9 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
             return;
         }
 
-        // Start background handler thread
-        HandlerThread handlerThread = new HandlerThread("CameraBackground");
-        handlerThread.start();
-        backgroundHandler = new Handler(handlerThread.getLooper());
-
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
 
-        isDetectionActive = true;
+        isDetectionActive.set(true);
         updateStatus("Detection active - scanning for objects");
     }
 
@@ -135,7 +166,6 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
 
         @Override
         public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-            // Update scale factors when texture size changes
             updateScaleFactors(width, height);
         }
 
@@ -146,77 +176,113 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
 
         @Override
         public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-            if (isDetectionActive && System.currentTimeMillis() - lastProcessingTime > PROCESSING_INTERVAL) {
-                processFrame();
-                lastProcessingTime = System.currentTimeMillis();
+            long currentTime = System.currentTimeMillis();
+            if (isDetectionActive.get() &&
+                    !isProcessingFrame.get() &&
+                    currentTime - lastProcessingTime > PROCESSING_INTERVAL) {
+
+                lastProcessingTime = currentTime;
+                // Process frame on background thread
+                if (backgroundHandler != null) {
+                    backgroundHandler.post(() -> processFrame());
+                }
             }
         }
     };
 
     private void updateScaleFactors(int viewWidth, int viewHeight) {
-        // Calculate scale factors to convert from model coordinates (480x480) to view coordinates
         scaleFactorX = (float) viewWidth / MODEL_INPUT_SIZE;
         scaleFactorY = (float) viewHeight / MODEL_INPUT_SIZE;
-
         Log.d(TAG, String.format("Scale factors - X: %.2f, Y: %.2f", scaleFactorX, scaleFactorY));
     }
 
     private void processFrame() {
-        Bitmap bitmap = textureView.getBitmap();
-        if (bitmap == null) return;
+        // Prevent concurrent processing
+        if (!isProcessingFrame.compareAndSet(false, true)) {
+            return;
+        }
 
+        Bitmap bitmap = null;
         try {
+            // Get bitmap from texture view (must be on UI thread context but getBitmap is safe)
+            bitmap = textureView.getBitmap();
+            if (bitmap == null || !isDetectionActive.get()) {
+                return;
+            }
+
             int originalWidth = bitmap.getWidth();
             int originalHeight = bitmap.getHeight();
 
-            // Convert to TensorImage and process
-            TensorImage image = TensorImage.fromBitmap(bitmap);
-            image = imageProcessor.process(image);
+            // Load bitmap into reusable TensorImage
+            reusableTensorImage.load(bitmap);
+            TensorImage processedImage = imageProcessor.process(reusableTensorImage);
 
             // Run object detection
-            List<Detection> detections = objectDetector.detect(image);
+            List<Detection> detections = objectDetector.detect(processedImage);
 
-            // Scale bounding boxes từ model (480x480) về bitmap size
-            List<Detection> scaledDetections = scaleBoundingBoxes(detections, originalWidth, originalHeight);
+            if (detections != null && !detections.isEmpty()) {
+                // Create scaled detections list (don't modify originals)
+                List<Detection> scaledDetections = createScaledDetections(detections, originalWidth, originalHeight);
 
-            // Update bounding box overlay
-            boundingBoxOverlay.setDetections(scaledDetections);
+                // Update UI on main thread
+                final List<Detection> finalDetections = scaledDetections;
+                runOnUiThread(() -> {
+                    if (boundingBoxOverlay != null) {
+                        boundingBoxOverlay.setDetections(finalDetections);
+                    }
+                });
 
-            // Process for voice announcements
-            processDetectionsForSpeech(detections, originalWidth, originalHeight);
+                // Process for speech (use original model coordinates)
+                processDetectionsForSpeech(detections, originalWidth, originalHeight);
+            } else {
+                // Clear overlay if no detections
+                runOnUiThread(() -> {
+                    if (boundingBoxOverlay != null) {
+                        boundingBoxOverlay.setDetections(null);
+                    }
+                });
+            }
 
         } catch (Exception e) {
             Log.e(TAG, "Error processing frame", e);
+        } finally {
+            // Always recycle bitmap to prevent memory leak
+            if (bitmap != null && !bitmap.isRecycled()) {
+                bitmap.recycle();
+            }
+            isProcessingFrame.set(false);
         }
     }
 
-    private List<Detection> scaleBoundingBoxes(List<Detection> detections, int bitmapWidth, int bitmapHeight) {
-        if (detections == null) return detections;
-
-        // Scale từ model size (480x480) về bitmap size
+    private List<Detection> createScaledDetections(List<Detection> detections, int bitmapWidth, int bitmapHeight) {
+        // Scale from model size (480x480) to bitmap size
         float scaleX = (float) bitmapWidth / MODEL_INPUT_SIZE;
         float scaleY = (float) bitmapHeight / MODEL_INPUT_SIZE;
 
+        // Create new list with scaled bounding boxes
+        List<ScaledDetection> scaledList = new ArrayList<>();
+
         for (Detection detection : detections) {
-            RectF boundingBox = detection.getBoundingBox();
+            if (detection.getCategories() != null && !detection.getCategories().isEmpty()) {
+                RectF originalBox = detection.getBoundingBox();
+                RectF scaledBox = new RectF(
+                        originalBox.left * scaleX,
+                        originalBox.top * scaleY,
+                        originalBox.right * scaleX,
+                        originalBox.bottom * scaleY
+                );
 
-            float left = boundingBox.left * scaleX;
-            float top = boundingBox.top * scaleY;
-            float right = boundingBox.right * scaleX;
-            float bottom = boundingBox.bottom * scaleY;
-
-            RectF scaledBoundingBox = new RectF(left, top, right, bottom);
-
-            try {
-                java.lang.reflect.Field field = detection.getClass().getDeclaredField("boundingBox");
-                field.setAccessible(true);
-                field.set(detection, scaledBoundingBox);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to scale bounding box", e);
+                scaledList.add(new ScaledDetection(
+                        detection.getCategories().get(0).getLabel(),
+                        detection.getCategories().get(0).getScore(),
+                        scaledBox
+                ));
             }
         }
 
-        return detections;
+        // Return as Detection list for compatibility with existing overlay
+        // Note: This requires updating BoundingBoxOverlayView to use ScaledDetection
+        return (List<Detection>)(List<?>) scaledList;
     }
 
     private void processDetectionsForSpeech(List<Detection> detections, int width, int height) {
@@ -232,13 +298,9 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
                 float confidence = detection.getCategories().get(0).getScore();
                 RectF boundingBox = detection.getBoundingBox();
 
-                // Use original coordinates for speech analysis (model coordinates)
-                float originalCenterX = boundingBox.centerX() / scaleFactorX;
-                float originalCenterY = boundingBox.centerY() / scaleFactorY;
-
                 ObstacleDetectorManager.DetectionResult result =
                         obstacleManager.analyzeDetection(objectName, confidence,
-                                originalCenterX, originalCenterY,
+                                boundingBox.centerX(), boundingBox.centerY(),
                                 MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, currentTime);
 
                 if (result != null && result.priority > maxPriority) {
@@ -249,9 +311,14 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         }
 
         if (bestResult != null) {
-            Log.d(TAG, "Voice announcement: " + bestResult.spokenMessage);
-            updateStatus("Detected: " + bestResult.objectName);
-            speak(bestResult.spokenMessage);
+            final ObstacleDetectorManager.DetectionResult finalResult = bestResult;
+            Log.d(TAG, "Voice announcement: " + finalResult.spokenMessage);
+
+            runOnUiThread(() -> {
+                updateStatus("Detected: " + finalResult.objectName);
+                speak(finalResult.spokenMessage);
+            });
+
             obstacleManager.updateLastSpokenTime(currentTime);
             obstacleManager.updateLastSpokenObject(bestResult.objectName);
         }
@@ -271,13 +338,15 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
 
                 @Override
                 public void onDisconnected(@NonNull CameraDevice camera) {
-                    cameraDevice.close();
+                    camera.close();
+                    cameraDevice = null;
                     updateStatus("Camera disconnected");
                 }
 
                 @Override
                 public void onError(@NonNull CameraDevice camera, int error) {
-                    cameraDevice.close();
+                    camera.close();
+                    cameraDevice = null;
                     updateStatus("Camera error: " + error);
                     speak("Camera error occurred");
                 }
@@ -340,6 +409,7 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
             requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_CAMERA);
         } else {
             if (textureView.getSurfaceTexture() != null) {
+                initializeComponents();
                 openCamera();
             }
         }
@@ -352,12 +422,11 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
         if (requestCode == REQ_CAMERA) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 if (textureView.getSurfaceTexture() != null) {
+                    initializeComponents();
                     openCamera();
                 }
             } else {
-                Toast.makeText(this, "Camera permission required for object detection",
-                        Toast.LENGTH_LONG).show();
-                updateStatus("Camera permission denied");
+                Toast.makeText(this, "Camera permission required", Toast.LENGTH_LONG).show();
                 speak("Camera permission is required");
                 finish();
             }
@@ -373,7 +442,7 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        isDetectionActive = false;
+        isDetectionActive.set(false);
         if (tts != null && tts.isSpeaking()) {
             tts.stop();
         }
@@ -382,7 +451,8 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        isDetectionActive = true;
+        startBackgroundThread();
+        isDetectionActive.set(true);
         if (tts != null) {
             speak("Resuming object detection");
         }
@@ -390,30 +460,41 @@ public class ObstacleDetectionActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
-        isDetectionActive = false;
+        isDetectionActive.set(false);
+
+        // Wait for any pending frame processing
+        while (isProcessingFrame.get()) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
 
         if (tts != null) {
             tts.stop();
             tts.shutdown();
+            tts = null;
         }
 
         if (cameraDevice != null) {
             cameraDevice.close();
+            cameraDevice = null;
         }
 
-        if (backgroundHandler != null) {
-            backgroundHandler.getLooper().quitSafely();
-        }
+        stopBackgroundThread();
 
         if (objectDetector != null) {
             objectDetector.close();
+            objectDetector = null;
         }
 
         if (obstacleManager != null) {
             obstacleManager.release();
+            obstacleManager = null;
         }
 
+        super.onDestroy();
         Log.d(TAG, "ObstacleDetectionActivity destroyed");
     }
 }
